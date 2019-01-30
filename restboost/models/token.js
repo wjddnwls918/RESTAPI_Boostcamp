@@ -9,8 +9,8 @@ module.exports = (sequelize, DataTypes) => {
 			type : DataTypes.STRING(255),
 			allowNull : false
 		},
-		expire_date : {
-			type : DataTypes.DATE,
+		expires_in : {
+			type : DataTypes.INTEGER,
 			allowNull : false
 		},
 		create_date : {

@@ -23,23 +23,28 @@ module.exports = (sequelize, DataTypes) => {
         },
         join_date : {
             type : DataTypes.DATE,
-            allowNull : false
+            allowNull : false,
+            defaultValue : DataTypes.NOW
         },
         score_normal : {
             type : DataTypes.INTEGER,
-            allowNull : false
+            allowNull : false,
+            defaultValue : 0
         },
         score_good : {
             type : DataTypes.INTEGER,
-            allowNull : false
+            allowNull : false,
+            defaultValue : 0
         },
         score_great : {
             type : DataTypes.INTEGER,
-            allowNull : false
+            allowNull : false,
+            defaultValue : 0
         },
         score_sum : {
             type : DataTypes.INTEGER,
-            allowNull : false
+            allowNull : false,
+            defaultValue : 0
         }
 
 		

@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
 			type : DataTypes.STRING(50),
 			allowNull : false
 		},
-		time : {
+		appointed_time : {
 			type : DataTypes.DATE,
 			allowNull : false
 		},
@@ -23,27 +23,27 @@ module.exports = (sequelize, DataTypes) => {
 		},
 		current_person : {
 			type : DataTypes.INTEGER,
-			allowNull : false
+			allowNull : false,
+            defaultValue : 1
 		},
 		restaurant_name : {
 			type : DataTypes.STRING(50),
-			allowNull : false
-		},
-		restaurant_address : {
-			type : DataTypes.STRING(50),
-			allowNull : false
+			allowNull : false,
+            defaultValue : ""
 		},
 		writer_id : {
 			type : DataTypes.INTEGER,
 			allowNull : false
 		},
-		writer_time : {
+		write_date : {
 			type : DataTypes.DATE,
-			allowNull : false
+			allowNull : false,
+            defaultValue : DataTypes.NOW
 		},
 		validation : {
 			type : DataTypes.INTEGER,
 			allowNull : false,
+            defaultValue : 0,
 			validate : {min : 0, max : 2}
 		},
 		content : {
@@ -52,16 +52,31 @@ module.exports = (sequelize, DataTypes) => {
 		},
 		expire_date : {
 			type : DataTypes.DATE,
-			allowNull : false
+			allowNull : true
 		},
 		longitude : {
-			type : DataTypes.STRING(50),
+			type : DataTypes.DOUBLE,
 			allowNull : false
 		},
 		latitude : {
-			type : DataTypes.STRING(50),
+			type : DataTypes.DOUBLE,
 			allowNull : false
-		}
+		},
+        budget : {
+            type : DataTypes.INTEGER,
+            allowNull : false,
+            defaultValue : 0
+        },
+        min_age : {
+            type : DataTypes.INTEGER,
+            allowNull : false
+        },
+        max_age : {
+            type : DataTypes.INTEGER,
+            allowNull : false
+        }
+
+
 	},
 		{
             timestamps : false,

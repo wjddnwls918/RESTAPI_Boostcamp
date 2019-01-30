@@ -6,16 +6,17 @@ var logger = require('morgan');
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
-
-var app = express();
-
-// sequelize add
-
+var bodyParser = require('body-parser');
+var apiBoost = require("./app/api/boostapi");
 var db = require("./models");
 
-var apiBoost = require("./app/api/boostapi");
+var app = express();
+app.use(bodyParser.urlencoded({extended:false}));
+app.use(bodyParser.json());
+
 
 apiBoost(app,db);
+
 
 // view engine setup
 //
@@ -23,6 +24,10 @@ app.set('port', (process.env.PORT || 80));
 
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
+
+// set body-parser
+app.use(bodyParser.urlencoded({ extended : false }));
+app.use(bodyParser.json());
 
 app.use(logger('dev'));
 app.use(express.json());
@@ -48,6 +53,8 @@ app.use(function(err, req, res, next) {
   res.status(err.status || 500);
   res.render('error');
 });
+
+
 
 db.sequelize.sync().then(() => {
 
