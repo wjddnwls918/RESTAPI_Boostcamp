@@ -2,8 +2,10 @@ const Sequelize = require('sequelize');
 
 module.exports = (app,db) => {
 
-    // test api
+    // test api 및  util api
 
+
+    //테이블 조회
     app.get( "/board", (req,res) =>
         db.board.findAll().then( (result) => res.json(result))
         );
@@ -26,43 +28,12 @@ module.exports = (app,db) => {
 
 
 
-	app.get( "/", (req,res) => 
-		{
-			res.send("Hello") 
-		}
-	);
-
-	app.get( "/test" , (req,res) => 
-		{
-			res.send("This is test");
-		}
-	);
-
-	app.get( "/select", (req,res) => 
-		db.participation.findAll().then( (result) => res.json(result) )
-	);
-			
-    app.get( "/test/:test", (req,res) => 
-        {
-            res.send("test is : " + req.params.test );
-            //test();
-            console.log(new Date());
-        });
 
 
-    var date = returnDate();
-
-    app.post( "/insertToParticipation", (req,res) => 
-        db.participation.create({
-                user_id : 1,
-                join_time : date,
-                board_id : 1 
-            }).then( ( result ) => res.json(result) )
-        );
-
+    //--------------------------------------------
     /*
     project api
-    boostcamp team d    
+    boostcamp team d
 
     */
 
@@ -86,10 +57,10 @@ module.exports = (app,db) => {
 
 
     //카카오 로그인 시 유저 정보 서버 저장
-    //이거 기존 사용자가 로그인 다시하면 안들어가게 해야됨 
-    //미완 
+    //이거 기존 사용자가 로그인 다시하면 안들어가게 해야됨
+    //미완
 
-    app.post( "/login/user", (req,res) => 
+    app.post( "/login/user", (req,res) =>
         db.user.create({
             nick_name : req.body.nick_name,
             age : req.body.age,
@@ -100,74 +71,60 @@ module.exports = (app,db) => {
 
     //Home----------------------------------------
 
-    
 
-    //현재 사용자 위치를 기준으로 1okm안 추천 게시글을 가져옴 
+    function getMyRanking(access_token) {
 
-/*
+      var query = "";
 
-    app.get( "/home/board/:longitude/:latitude" , (req,res) =>
-        db.board.findAll(
-        {
-            where : {
-                getDistanceFromLatLonInKm( req.params.latitude, req.params.longitude,
-               db.board.latitude, db.board.longitude) : {
-                    [Op.lte] : 10
-                }
-            }
-        }).then( (result) => res.json(result))
-       // .catch( (error) => res.send("error occured") )
-        );
+      query += "SELECT id,nick_name, score_sum, rank FROM (";
+      query += "SELECT    id,";
+      query += "nick_name,";
+      query += "score_sum,";
+      query += "@vRank := @vRank + 1 AS rank ";
+      query += "FROM      `user` AS p, (SELECT @vRank := 0) AS r ";
+      query += "ORDER BY  score_sum DESC ";
+      query += ") AS CNT WHERE id = (SELECT `user_id` FROM `token` WHERE `access_token` = "+access_token+");";
 
-*/
-    app.get( "/rawtest" , (req,res)=>
-    db.sequelize.query('select * from `user`')
-        .then( user => {
-            res.json(user)
-        })
+      return query;
+    }
+
+    app.get( "/home/ranking/me" , (req,res) =>
+
+      db.sequelize.query( getMyRanking( req.headers.access_token) )
+      .then( (result) => res.json(result))
+
+
+
     );
-         
+
+
+
+    //현재 사용자 위치를 기준으로 1okm안 추천 게시글을 가져옴
+
+    function getRecommendBoard(longitude, latitude) {
+        var query ="";
+
+        query += "SELECT * FROM `board` WHERE `longitude` >= "+(longitude - 0.05)+" AND `longitude` <= "+(longitude + 0.05);
+        query += " AND `latitude` >= "+(latitude - 0.05)+" AND `latitude` <= "+(latitude + 0.05)+" limit 4;";
+
+
+        return query;
+
+    }
+
+
+    app.get( "/home/board/:longitude/:latitude", (req,res) =>
+        db.sequelize.query( getRecommendBoard( req.params.longitude, req.params.latitude ) )
+        .then( result => res.json(result))
+
+
+    );
+
+
 
 
     //score_sum 필드를 기준으로 사용자 등수를 가져옴
 
-    function setQuery(access_token){
-
-    var query = "";
-    query += 'SELECT nick_name, score_sum, rank FROM';
-    query += 'SELECT nick_name, score_sum, @vRank := @vRank + 1 AS rank';
-    query += 'FROM user AS p, (SELECT @vRank != 0) AS r';
-    query += 'ORDER BY score_sum DESC';
-    query += ') AS CNT WHERE nick_name = ' + access_token +';';
-    
-    return query;
-
-    }
-/*
-    app.get( "/home/ranking/me/:acces_token", (req,res) =>
-            db.sequelize.query(setQuery(req.params.access_token))
-            .then( myrank => {
-                res.json(myrank)
-            })
-            
-    );
-*/
-
-
-
-/*
-    app.get( "/home/ranking/me/:access_token", (req,res) =>
-        db.token.findOne(
-        {
-            attributes : ['user_id'],
-            where {
-                access_token : req.params.access_token
-            }
-        }).then( foundUser => {
-            return foundUser.get()
-        }).then( userData => {
-            //user_id를 기준으로 
-  */          
 
 
 
@@ -181,12 +138,33 @@ module.exports = (app,db) => {
             limit: 10,
             order: [['score_sum', 'DESC']]
         }).then( (result) => res.json(result))
-       
-       ); 
-    
+
+       );
+
 
 
     //Map-----------------------------------------
+
+    //사용자가 지정한 위치의 경도, 위도를 보내 게시글의 리스트를 가져옴
+
+    function getCurrentPosBoard(left_longitude, left_latitude, right_longitude, right_latitude) {
+
+        var query = "";
+
+        query += "SELECT * FROM `board` WHERE `longitude` >= "+left_longitude+" AND `longitude` <= "+right_longitude;
+        query += " AND `latitude` >= "+left_latitude+" AND `latitude` <= "+right_latitude;
+
+
+        return query;
+
+    }
+
+
+    app.get( "/map/list", (req,res) =>
+            db.sequelize.query( getCurrentPosBoard( req.query.left_longitude, req.query.left_latitude, req.query.right_longitude, req.query.right_latitude) )
+            .then( result => res.json(result) )
+
+        );
 
 
     //Board_Preview-------------------------------
@@ -195,7 +173,92 @@ module.exports = (app,db) => {
     //Map_Search----------------------------------
 
 
+
+    //검색어로 위치에 해당하는 게시글 검색하기
+    function getSearchBoard(address, min_time, max_time, min_age, max_age, budget ) {
+
+        var query = "";
+
+        query += "SELECT * FROM `board` WHERE address like "+address+" and appointed_time >= date_add(date(now()), INTERVAL "+min_time+" hour)";
+        query += " and appointed_time <= date_add(date(now()), INTERVAL "+max_time+" hour) and min_age >= "+min_age+" and max_age <= "+max_age+"";
+        query += " and budget <= "+budget+"";
+
+        return query;
+
+
+    }
+
+
+    app.get( "/search/list" , (req,res) => {
+        db.sequelize.query( getSearchBoard(req.query.address, req.query.min_time, req.query.max_time, req.query.min_age, req.query.max_age, req.query.budget) )
+        .then( (result) => res.json(result) )
+
+        }
+
+     );
+
+
+/*
+    app.get( "/search/list" , (req,res) =>
+        res.send("test")
+        );
+*/
+
+
     //Board_List----------------------------------
+
+    //사용자가 생성한 게시글 불러오기
+    function getMyBoard( access_token ) {
+
+        var query = "";
+
+        query += "SELECT b.id, b.address, b.title, b.appointed_time, b.current_person, b.max_person, b.write_date, b.content,";
+        query += "b.latitude, b.longitude, b.budget, b.min_age, b.max_age ,";
+        query += "u.nick_name, u.photo FROM board b ";
+        query += "LEFT JOIN user u ON b.writer_id = u.id ";
+        query += "LEFT JOIN token t ON u.id = t.user_id ";
+        query += "WHERE t.access_token LIKE "+access_token;
+
+        return query;
+
+    }
+
+
+    app.get( "/board/list/my" , (req,res) =>
+        db.sequelize.query( getMyBoard( req.headers.access_token ) )
+        .then( (result) => res.json(result) )
+
+        );
+
+
+    //사용자가 참여중인 게시글 불러오기
+
+    function currentJoinBoard( access_token ) {
+
+        var query ="";
+
+
+        query +="SELECT b.id, b.address, b.title, b.appointed_time, b.current_person, b.max_person, b.write_date, b.content,";
+        query +="b.latitude, b.longitude, b.budget, b.min_age, b.max_age, u.photo, u.nick_name";
+        query +=" FROM board b ";
+        query +="LEFT JOIN participation p ON p.board_id = b.id ";
+        query +="LEFT JOIN user u ON b.writer_id = u.id ";
+        query +="LEFT JOIN token t ON t.user_id = p.user_id ";
+        query +="WHERE t.access_token LIKE "+access_token +" AND b.writer_id != t.user_id;";
+
+
+
+        return query;
+
+    }
+
+    app.get( "/board/list/participation/", (req,res) =>
+
+        db.sequelize.query( currentJoinBoard ( req.headers.access_token ) )
+        .then( result => res.json(result))
+
+
+    );
 
 
     //Board_Add-----------------------------------
@@ -203,18 +266,15 @@ module.exports = (app,db) => {
     //사용자가 작성한 게시글 등록
     app.post( "/board", (req,res) =>
         db.board.create({
-            address : req.body.address,
             title : req.body.title,
+            address : req.body.address,
             appointed_time : req.body.appointed_time,
-            max_pserson : req.body.max_person,
-            current_person : req.body.current_person,
-            restaurant_name : req.body.restaurant_name,
-            restaurant_address : req.body.restaurant_address,
+            max_person : req.body.max_person,
             writer_id : req.body.writer_id,
-            write_date : req.body.write_date,
-            validation : req.body.validation,
+            min_age : req.body.min_age,
+            max_age : req.body.max_age,
+            budget : req.body.budget,
             content : req.body.content,
-            expire_date : req.body.expire_date,
             longitude : req.body.longitude,
             latitude : req.body.latitude
         }).then( (result) => res.json(result) )
@@ -237,14 +297,54 @@ module.exports = (app,db) => {
     //User_Evaluation-----------------------------
 
 
-    
+    function updateUserScoreQuery(users) {
+
+        console.log( typeof(users) );
+
+
+        /*
+        var query = "";
+
+        query += "SET @score=2;";
+        query += "UPDATE USER u";
+        query += "SET";
+
+        query += "score_normal = IF(@score=2, u.score_normal+1, u.score_normal),";
+        query += "score_good = IF(@score=3, u.score_good+1, u.score_good),";
+        query += "score_great = IF(@score=5, u.score_great+1, u.score_great),";
+        query += "score_sum =";
+        query += "CASE(@score)";
+        query += " WHEN 2 THEN (score_sum+2)";
+        query += " WHEN 3 THEN (score_sum+3)";
+        query += " WHEN 5 THEN (score_sum+5)";
+        query += "END";
+        query += "WHERE u.id IN ("+users+");";
+
+        */
+    }
+
+    app.put( "/board/user/evaluation", (req,res) =>{
+
+
+        for(var i in req.body.users){
+            console.log( i );
+        }
+
+        //db.sequelize.query(updateUserScoreQuery( req.body.users ) )
+        //.then( (result) => res.json(result) )
+
+    }
+
+    );
+
+
 
 
     //MyPage_Edit---------------------------------
 
     //닉네임, 나이 , 성별 , 프로필 사진업데이트
-   
-  
+
+
    app.put( "/mypage/:nick_name", (req,res) =>
          db.user.update({
             nick_name : req.body.nick_name,
@@ -256,11 +356,11 @@ module.exports = (app,db) => {
                  nick_name : req.params.nick_name
              }
          }
-         
-         
+
+
          ).then( (result) => res.json(result) )
    );
-  
+
 
 
 
