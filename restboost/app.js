@@ -9,13 +9,13 @@ var usersRouter = require('./routes/users');
 var bodyParser = require('body-parser');
 var apiBoost = require("./app/api/boostapi");
 var db = require("./models");
-
+var Sequelize = require('sequelize');
 var app = express();
 app.use(bodyParser.urlencoded({extended:false}));
 app.use(bodyParser.json());
 
 
-apiBoost(app,db);
+apiBoost(app,db,Sequelize);
 
 
 // view engine setup

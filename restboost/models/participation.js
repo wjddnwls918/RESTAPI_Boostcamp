@@ -13,7 +13,8 @@ module.exports = (sequelize, DataTypes) => {
 		},
 		join_time : {
 			type: DataTypes.DATE,
-			allowNull: false
+			allowNull: false,
+            defaultValue : DataTypes.NOW
 		},
 		board_id : {
 			type: DataTypes.INTEGER,

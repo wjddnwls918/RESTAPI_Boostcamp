@@ -1,6 +1,6 @@
-const Sequelize = require('sequelize');
 
-module.exports = (app,db) => {
+
+module.exports = (app,db,sequelize) => {
 
     // test api 및  util api
 
@@ -37,8 +37,8 @@ module.exports = (app,db) => {
 
     */
 
-    const Sequelize = require('sequelize');
-    const Op = Sequelize.Op
+
+    const Op = sequelize.Op
 
 
 
@@ -72,18 +72,18 @@ module.exports = (app,db) => {
     //Home----------------------------------------
 
 
+
+    //score_sum 필드를 기준으로 사용자 등수를 가져옴
     function getMyRanking(access_token) {
 
-      var query = "";
-
-      query += "SELECT id,nick_name, score_sum, rank FROM (";
-      query += "SELECT    id,";
-      query += "nick_name,";
-      query += "score_sum,";
-      query += "@vRank := @vRank + 1 AS rank ";
-      query += "FROM      `user` AS p, (SELECT @vRank := 0) AS r ";
-      query += "ORDER BY  score_sum DESC ";
-      query += ") AS CNT WHERE id = (SELECT `user_id` FROM `token` WHERE `access_token` = "+access_token+");";
+      const query = "SELECT id,nick_name, score_sum, rank FROM ("
+                  + "SELECT    id,"
+                  + "nick_name,"
+                  + "score_sum,"
+                  + "@vRank := @vRank + 1 AS rank "
+                  + "FROM      `user` AS p, (SELECT @vRank := 0) AS r "
+                  + "ORDER BY  score_sum DESC "
+                  + ") AS CNT WHERE id = (SELECT `user_id` FROM `token` WHERE `access_token` = "+access_token+");";
 
       return query;
     }
@@ -93,38 +93,30 @@ module.exports = (app,db) => {
       db.sequelize.query( getMyRanking( req.headers.access_token) )
       .then( (result) => res.json(result))
 
-
-
     );
 
 
 
     //현재 사용자 위치를 기준으로 1okm안 추천 게시글을 가져옴
 
-    function getRecommendBoard(longitude, latitude) {
-        var query ="";
 
-        query += "SELECT * FROM `board` WHERE `longitude` >= "+(longitude - 0.05)+" AND `longitude` <= "+(longitude + 0.05);
-        query += " AND `latitude` >= "+(latitude - 0.05)+" AND `latitude` <= "+(latitude + 0.05)+" limit 4;";
+    app.get( "/home/board/:longitude/:latitude" , (req,res) =>
 
+      db.board.findAll({
 
-        return query;
+        where :{
+          [Op.and] : [ {longitude : {[Op.gte]: (Number(req.params.longitude) - 0.05) } },
+                      {longitude : {[Op.lte]: (Number(req.params.longitude) + 0.05) } },
+                      {latitude : {[Op.gte]: (Number(req.params.latitude) - 0.05) }},
+                      {latitude : {[Op.lte]: (Number(req.params.latitude) + 0.05) }}
+                     ]
+        },
+        limit : 4
 
-    }
-
-
-    app.get( "/home/board/:longitude/:latitude", (req,res) =>
-        db.sequelize.query( getRecommendBoard( req.params.longitude, req.params.latitude ) )
-        .then( result => res.json(result))
-
-
-    );
+      }).then( result => res.json(result))
 
 
-
-
-    //score_sum 필드를 기준으로 사용자 등수를 가져옴
-
+  );
 
 
 
@@ -149,14 +141,9 @@ module.exports = (app,db) => {
 
     function getCurrentPosBoard(left_longitude, left_latitude, right_longitude, right_latitude) {
 
-        var query = "";
-
-        query += "SELECT * FROM `board` WHERE `longitude` >= "+left_longitude+" AND `longitude` <= "+right_longitude;
-        query += " AND `latitude` >= "+left_latitude+" AND `latitude` <= "+right_latitude;
-
-
+        const query = "SELECT * FROM `board` WHERE `longitude` >= "+left_longitude+" AND `longitude` <= "+right_longitude
+                      +" AND `latitude` >= "+left_latitude+" AND `latitude` <= "+right_latitude;
         return query;
-
     }
 
 
@@ -169,19 +156,57 @@ module.exports = (app,db) => {
 
     //Board_Preview-------------------------------
 
+    app.post( "/board/participation", (req,res) =>
+    {
+
+
+
+        db.token.findOne({
+          attributes : ['user_id'],
+          where : {
+            access_token : req.headers.access_token
+          }
+        }).then( result => {
+
+          console.log(result);
+
+          if(result!=null){
+            db.participation.create({
+              user_id : result,
+              board_id : req.headers.board_id,
+              is_evaluated : 0
+            })
+
+          }
+
+        });
+
+
+        //console.log(user_id);
+
+        db.board.update({
+            current_person : current_person+1
+        },
+        {
+          where : {
+            board_id : req.headers.board_id
+          }
+        }
+
+      ).then( result => res.json(result))
+
+    });
+
+
 
     //Map_Search----------------------------------
-
-
 
     //검색어로 위치에 해당하는 게시글 검색하기
     function getSearchBoard(address, min_time, max_time, min_age, max_age, budget ) {
 
-        var query = "";
-
-        query += "SELECT * FROM `board` WHERE address like "+address+" and appointed_time >= date_add(date(now()), INTERVAL "+min_time+" hour)";
-        query += " and appointed_time <= date_add(date(now()), INTERVAL "+max_time+" hour) and min_age >= "+min_age+" and max_age <= "+max_age+"";
-        query += " and budget <= "+budget+"";
+        const query = "SELECT * FROM `board` WHERE address like "+address+" and appointed_time >= date_add(date(now()), INTERVAL "+min_time+" hour)"
+                    + " and appointed_time <= date_add(date(now()), INTERVAL "+max_time+" hour) and min_age >= "+min_age+" and max_age <= "+max_age
+                    + " and budget <= "+budget+"";
 
         return query;
 
@@ -210,14 +235,12 @@ module.exports = (app,db) => {
     //사용자가 생성한 게시글 불러오기
     function getMyBoard( access_token ) {
 
-        var query = "";
-
-        query += "SELECT b.id, b.address, b.title, b.appointed_time, b.current_person, b.max_person, b.write_date, b.content,";
-        query += "b.latitude, b.longitude, b.budget, b.min_age, b.max_age ,";
-        query += "u.nick_name, u.photo FROM board b ";
-        query += "LEFT JOIN user u ON b.writer_id = u.id ";
-        query += "LEFT JOIN token t ON u.id = t.user_id ";
-        query += "WHERE t.access_token LIKE "+access_token;
+        const query = "SELECT b.id, b.address, b.title, b.appointed_time, b.current_person, b.max_person, b.write_date, b.content,"
+                    + "b.latitude, b.longitude, b.budget, b.min_age, b.max_age ,"
+                    + "u.nick_name, u.photo FROM board b "
+                    + "LEFT JOIN user u ON b.writer_id = u.id "
+                    + "LEFT JOIN token t ON u.id = t.user_id "
+                    + "WHERE t.access_token LIKE "+access_token;
 
         return query;
 
@@ -235,18 +258,13 @@ module.exports = (app,db) => {
 
     function currentJoinBoard( access_token ) {
 
-        var query ="";
-
-
-        query +="SELECT b.id, b.address, b.title, b.appointed_time, b.current_person, b.max_person, b.write_date, b.content,";
-        query +="b.latitude, b.longitude, b.budget, b.min_age, b.max_age, u.photo, u.nick_name";
-        query +=" FROM board b ";
-        query +="LEFT JOIN participation p ON p.board_id = b.id ";
-        query +="LEFT JOIN user u ON b.writer_id = u.id ";
-        query +="LEFT JOIN token t ON t.user_id = p.user_id ";
-        query +="WHERE t.access_token LIKE "+access_token +" AND b.writer_id != t.user_id;";
-
-
+        const query ="SELECT b.id, b.address, b.title, b.appointed_time, b.current_person, b.max_person, b.write_date, b.content,"
+                    +"b.latitude, b.longitude, b.budget, b.min_age, b.max_age, u.photo, u.nick_name"
+                    +" FROM board b "
+                    +"LEFT JOIN participation p ON p.board_id = b.id "
+                    +"LEFT JOIN user u ON b.writer_id = u.id "
+                    +"LEFT JOIN token t ON t.user_id = p.user_id "
+                    +"WHERE t.access_token LIKE "+access_token +" AND b.writer_id != t.user_id;";
 
         return query;
 
@@ -256,7 +274,6 @@ module.exports = (app,db) => {
 
         db.sequelize.query( currentJoinBoard ( req.headers.access_token ) )
         .then( result => res.json(result))
-
 
     );
 
@@ -284,7 +301,7 @@ module.exports = (app,db) => {
     //Board_Detail--------------------------------
 
     //게시글에 달린 댓글 불러오기
-    app.get( "/comment/list/:board_id", (req,res) =>
+    app.get( "/board/comment/:board_id", (req,res) =>
         db.comment.findAll({
         where: {
             board_id : req.params.board_id
@@ -326,9 +343,9 @@ module.exports = (app,db) => {
     app.put( "/board/user/evaluation", (req,res) =>{
 
 
-        for(var i in req.body.users){
-            console.log( i );
-        }
+
+            console.log( req.query.users );
+
 
         //db.sequelize.query(updateUserScoreQuery( req.body.users ) )
         //.then( (result) => res.json(result) )
