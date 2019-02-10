@@ -6,6 +6,7 @@ module.exports = (app,db,sequelize) => {
 
 
     //테이블 조회
+
     app.get( "/board", (req,res) =>
         db.board.findAll().then( (result) => res.json(result))
         );

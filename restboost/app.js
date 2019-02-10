@@ -1,16 +1,37 @@
-var createError = require('http-errors');
-var express = require('express');
-var path = require('path');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
+const createError = require('http-errors');
+const express = require('express');
+const path = require('path');
+const cookieParser = require('cookie-parser');
+const logger = require('morgan');
 
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
-var bodyParser = require('body-parser');
-var apiBoost = require("./app/api/boostapi");
-var db = require("./models");
-var Sequelize = require('sequelize');
-var app = express();
+const indexRouter = require('./routes/index');
+const usersRouter = require('./routes/users');
+const bodyParser = require('body-parser');
+const apiBoost = require("./app/api/boostapi");
+const db = require("./models");
+const Sequelize = require('sequelize');
+
+//swagger
+
+const swaggerJSDoc = require('swagger-jsdoc');
+
+const options = {
+  definition: {
+    info: {
+      title: 'ET APP API', // Title (required)
+      version: '1.0.0', // Version (required)
+    },
+  },
+  // Path to the API docs
+  apis: ['./app/api/swagger.js'],
+};
+
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = swaggerJSDoc(options);
+
+
+
+const app = express();
 app.use(bodyParser.urlencoded({extended:false}));
 app.use(bodyParser.json());
 
@@ -29,6 +50,9 @@ app.set('view engine', 'pug');
 app.use(bodyParser.urlencoded({ extended : false }));
 app.use(bodyParser.json());
 
+// swagger
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -37,6 +61,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
+
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
