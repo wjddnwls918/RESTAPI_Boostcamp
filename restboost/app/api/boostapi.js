@@ -42,6 +42,21 @@ module.exports = (app,db,sequelize) => {
     const Op = sequelize.Op
 
 
+    //MyPage
+    app.get("/user/info" , (req,res) => {
+      db.user.findOne({
+
+        where :{
+          kakao_id : req.headers.kakao_id
+        }
+
+      }).then( result => res.json(result))
+      .catch( err => res.json({ "code" : 400,
+         "message" : "error, check your code"
+        }))
+    });
+
+
 
     //Login---------------------------------------
     //카카오 로그인 시 토큰 정보 서버 저장
@@ -61,21 +76,34 @@ module.exports = (app,db,sequelize) => {
     //이거 기존 사용자가 로그인 다시하면 안들어가게 해야됨
     //미완
 
-    app.post( "/login/user", (req,res) =>
-        db.user.create({
-            nick_name : req.body.nick_name,
-            age : req.body.age,
-            sex : req.body.sex,
-            photo : req.body.photo
-        }).then( (result) => res.json(result))
-        );
+    function setUser(kakao_id, nick_name, sex, age, photo) {
+
+      const query = "INSERT INTO user (kakao_id, nick_name, sex, age, photo) VALUES ("
+          + kakao_id+", \""+nick_name+"\", "+sex+", "+age+", \""+photo+"\")"
+          +" ON DUPLICATE KEY UPDATE kakao_id="+kakao_id+", nick_name=\""+nick_name+"\", sex ="+sex+", age ="+age+", photo =\""+photo+"\"";
+
+      return query;
+    }
+
+
+    app.post( "/user", (req,res) => {
+
+      db.sequelize.query( setUser( req.body.kakao_id, req.body.nick_name, req.body.sex, req.body.age, req.body.photo) )
+      .then( () => res.json({ "code" : 200,
+         "message" : "success"
+        }))
+      .catch( (err) => res.json({ "code" : 400,
+         "message" : "error, check your code"
+        }))
+    });
+
 
     //Home----------------------------------------
 
 
 
     //score_sum 필드를 기준으로 사용자 등수를 가져옴
-    function getMyRanking(access_token) {
+    function getMyRanking(kakao_id) {
 
       const query = "SELECT id,nick_name, score_sum, rank FROM ("
                   + "SELECT    id,"
@@ -84,15 +112,19 @@ module.exports = (app,db,sequelize) => {
                   + "@vRank := @vRank + 1 AS rank "
                   + "FROM      `user` AS p, (SELECT @vRank := 0) AS r "
                   + "ORDER BY  score_sum DESC "
-                  + ") AS CNT WHERE id = (SELECT `user_id` FROM `token` WHERE `access_token` = "+access_token+");";
+                  + ") AS CNT WHERE id = (SELECT `id` FROM `user` WHERE `kakao_id` = "+kakao_id+") limit 1;";
+
 
       return query;
     }
 
     app.get( "/home/ranking/me" , (req,res) =>
 
-      db.sequelize.query( getMyRanking( req.headers.access_token) )
-      .then( (result) => res.json(result))
+      db.sequelize.query( getMyRanking( req.headers.kakao_id) , { type: sequelize.QueryTypes.SELECT } )
+      .then( (result) => res.json(result[0]))
+      .catch( err =>  res.json({ "code" : 400,
+         "message" : "error, check your code"
+       }))
 
     );
 
@@ -100,24 +132,51 @@ module.exports = (app,db,sequelize) => {
 
     //현재 사용자 위치를 기준으로 1okm안 추천 게시글을 가져옴
 
+    function getRecommendBoard(longitude, latitude) {
 
-    app.get( "/home/board/:longitude/:latitude" , (req,res) =>
+      const query = "SELECT * from board join user on board.writer_id = user.kakao_id "
+        +" where longitude>="+(Number(longitude) - 0.05)+" and longitude<="+(Number(longitude) + 0.05)
+        +" and latitude>="+(Number(latitude) - 0.05)+" and latitude<="+(Number(latitude) + 0.05)+" limit 4";
 
+      return query;
+    }
+
+    app.get( "/home/board" , (req,res) =>{
+      db.sequelize.query( getRecommendBoard(req.query.longitude, req.query.latitude) , { type: sequelize.QueryTypes.SELECT })
+      .then( result => res.json(result))
+      .catch( err =>  res.json({ "code" : 400,
+         "message" : "error, check your code"
+       }))
+/*
+      db.user.hasMany(db.board, {foreignKey:'writer_id'});
+      db.board.belongsTo(db.user, {foreignKey: 'writer_id'});
       db.board.findAll({
 
         where :{
-          [Op.and] : [ {longitude : {[Op.gte]: (Number(req.params.longitude) - 0.05) } },
-                      {longitude : {[Op.lte]: (Number(req.params.longitude) + 0.05) } },
-                      {latitude : {[Op.gte]: (Number(req.params.latitude) - 0.05) }},
-                      {latitude : {[Op.lte]: (Number(req.params.latitude) + 0.05) }}
+          [Op.and] : [ {longitude : {[Op.gte]: (Number(req.query.longitude) - 0.05) } },
+                      {longitude : {[Op.lte]: (Number(req.query.longitude) + 0.05) } },
+                      {latitude : {[Op.gte]: (Number(req.query.latitude) - 0.05) }},
+                      {latitude : {[Op.lte]: (Number(req.query.latitude) + 0.05) }}
                      ]
         },
-        limit : 4
+        limit : 4,
+        include: [{
+          model: db.user,
+          //attributes : {kakao_id}
+          //where: ["writer_id = kakao_id"],
+          //through: {
+          //  attributes: ['photo'],
+            //where: {completed: true}
+          //},
+          required: true
+        }]
 
       }).then( result => res.json(result))
-
-
-  );
+      .catch( err =>  res.json({ "code" : 400,
+         "message" : "error, check your code"
+        }))
+*/
+  });
 
 
 
@@ -126,11 +185,15 @@ module.exports = (app,db,sequelize) => {
     app.get( "/home/ranking/user", (req,res) =>
         db.user.findAll(
         {
-            attributes : ['nick_name','photo'],
+            attributes : ['nick_name','photo','score_sum'],
             offset: 0,
             limit: 10,
             order: [['score_sum', 'DESC']]
-        }).then( (result) => res.json(result))
+        }).then(function(result) {
+            res.json(result);
+        }).catch(function(err) {
+            res.send("error");
+        })
 
        );
 
@@ -149,7 +212,8 @@ module.exports = (app,db,sequelize) => {
 
 
     app.get( "/map/list", (req,res) =>
-            db.sequelize.query( getCurrentPosBoard( req.query.left_longitude, req.query.left_latitude, req.query.right_longitude, req.query.right_latitude) )
+            db.sequelize.query( getCurrentPosBoard( req.query.left_longitude, req.query.left_latitude, req.query.right_longitude, req.query.right_latitude)
+            , { type: sequelize.QueryTypes.SELECT } )
             .then( result => res.json(result) )
 
         );
@@ -203,11 +267,24 @@ module.exports = (app,db,sequelize) => {
     //Map_Search----------------------------------
 
     //검색어로 위치에 해당하는 게시글 검색하기
-    function getSearchBoard(address, min_time, max_time, min_age, max_age, budget ) {
+    function getSearchBoard(keyword, min_time, max_time, min_age, max_age, budget ) {
 
-        const query = "SELECT * FROM `board` WHERE address like "+address+" and appointed_time >= date_add(date(now()), INTERVAL "+min_time+" hour)"
-                    + " and appointed_time <= date_add(date(now()), INTERVAL "+max_time+" hour) and min_age >= "+min_age+" and max_age <= "+max_age
-                    + " and budget <= "+budget+"";
+        console.log(typeof(budget));
+
+        let transBudget;
+
+        if(Number(budget) == 0) {
+          transBudget = 99999999;
+        }else {
+          transBudget = budget;
+        }
+
+        const query = "SELECT * FROM `board` WHERE address like \'%"+keyword+"%\' "
+
+        + " and appointed_time >= date_add(date(now()), INTERVAL "+min_time+" hour) and appointed_time <= date_add(date(now()), INTERVAL "+max_time+" hour)"
+        + " and min_age >= "+min_age+" and max_age <= "+max_age
+        + " and budget <= "+transBudget+"";
+
 
         return query;
 
@@ -216,7 +293,8 @@ module.exports = (app,db,sequelize) => {
 
 
     app.get( "/search/list" , (req,res) => {
-        db.sequelize.query( getSearchBoard(req.query.address, req.query.min_time, req.query.max_time, req.query.min_age, req.query.max_age, req.query.budget) )
+        db.sequelize.query( getSearchBoard(req.query.keyword, req.query.min_time, req.query.max_time, req.query.min_age, req.query.max_age, req.query.budget)
+                          , { type: sequelize.QueryTypes.SELECT } )
         .then( (result) => res.json(result) )
 
         }
@@ -249,7 +327,7 @@ module.exports = (app,db,sequelize) => {
 
 
     app.get( "/board/list/my" , (req,res) =>
-        db.sequelize.query( getMyBoard( req.headers.access_token ) )
+        db.sequelize.query( getMyBoard( req.headers.access_token ) , { type: sequelize.QueryTypes.SELECT } )
         .then( (result) => res.json(result) )
 
         );
@@ -273,7 +351,7 @@ module.exports = (app,db,sequelize) => {
 
     app.get( "/board/list/participation/", (req,res) =>
 
-        db.sequelize.query( currentJoinBoard ( req.headers.access_token ) )
+        db.sequelize.query( currentJoinBoard ( req.headers.access_token ) , { type: sequelize.QueryTypes.SELECT } )
         .then( result => res.json(result))
 
     );
@@ -315,45 +393,42 @@ module.exports = (app,db,sequelize) => {
     //User_Evaluation-----------------------------
 
 
-    function updateUserScoreQuery(users) {
+    function updateUserScoreQuery(user) {
 
-        console.log( typeof(users) );
+        const query =  "SET @score=2;";
+                    + " UPDATE USER u";
+                    + " SET";
 
+                    + "score_normal = IF(@score=2, u.score_normal+1, u.score_normal),";
+                    + " score_good = IF(@score=3, u.score_good+1, u.score_good),";
+                    + " score_great = IF(@score=5, u.score_great+1, u.score_great),";
+                    + " score_sum =";
+                    + " CASE(@score)";
+                    + " WHEN 2 THEN (score_sum+2)";
+                    + " WHEN 3 THEN (score_sum+3)";
+                    + " WHEN 5 THEN (score_sum+5)";
+                    + " END";
+                    + " WHERE u.id IN ("+users+");";
 
-        /*
-        var query = "";
-
-        query += "SET @score=2;";
-        query += "UPDATE USER u";
-        query += "SET";
-
-        query += "score_normal = IF(@score=2, u.score_normal+1, u.score_normal),";
-        query += "score_good = IF(@score=3, u.score_good+1, u.score_good),";
-        query += "score_great = IF(@score=5, u.score_great+1, u.score_great),";
-        query += "score_sum =";
-        query += "CASE(@score)";
-        query += " WHEN 2 THEN (score_sum+2)";
-        query += " WHEN 3 THEN (score_sum+3)";
-        query += " WHEN 5 THEN (score_sum+5)";
-        query += "END";
-        query += "WHERE u.id IN ("+users+");";
-
-        */
+                    return query;
     }
 
     app.put( "/board/user/evaluation", (req,res) =>{
 
+      let users = req.body.users;
+
+      for(user in users) {
+        db.sequelize.query( updateUserScoreQuery ( user ) )
+        .then( result => res.json(result))
+        .catch(function(err) {
+            res.send("error");
+        })
 
 
-            console.log( req.query.users );
+      }
 
 
-        //db.sequelize.query(updateUserScoreQuery( req.body.users ) )
-        //.then( (result) => res.json(result) )
-
-    }
-
-    );
+    });
 
 
 

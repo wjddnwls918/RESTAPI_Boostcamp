@@ -14,16 +14,17 @@ module.exports = (sequelize, DataTypes) => {
             allowNull : false
         },
         sex : {
-            type : DataTypes.STRING(50),
-            allowNull : false
+            type : DataTypes.INTEGER,
+            allowNull : false,
+            validate : { min : 0 , max : 1 }
         },
         photo : {
-            type : DataTypes.STRING(50),
+            type : DataTypes.TEXT,
             allowNull : false
         },
         join_date : {
             type : DataTypes.DATE,
-            allowNull : false,
+            allowNull : true,
             defaultValue : DataTypes.NOW
         },
         score_normal : {
@@ -45,9 +46,14 @@ module.exports = (sequelize, DataTypes) => {
             type : DataTypes.INTEGER,
             allowNull : false,
             defaultValue : 0
+        },
+        kakao_id : {
+            type : DataTypes.BIGINT,
+            allowNull : false,
+						unique : true
         }
 
-		
+
 	},
 		{
             timestamps : false,
@@ -57,5 +63,3 @@ module.exports = (sequelize, DataTypes) => {
 
 	return User;
 }
-
-

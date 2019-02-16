@@ -21,10 +21,79 @@
 *        type: varchar(50)
 *      writer_id:
 *        type: int(11)
+*      write_date:
+*        type: datetime
+*      validation:
+*        type: int(11)
+*      content:
+*        type: text
+*      expire_date:
+*        type: datetime
+*      longitude:
+*        type: double
+*      latitude:
+*        type: double
+*      budget:
+*        type: int(11)
+*      min_age:
+*        type: int(11)
+*      max_age:
+*        type: int(11)
+*  comment:
+*    type: object
+*    properties:
+*      id:
+*        type: int(11)
+*      writer_id:
+*        type: int(11)
+*      board_id:
+*        type: int(11)
+*      write_time:
+*        type: datetime
+*      content:
+*        type: text
+*  participation:
+*    type: object
+*    properties:
+*      id:
+*        type: int(11)
+*      user_id:
+*        type: int(11)
+*      join_time:
+*        type: datetime
+*      board_id:
+*        type: int(11)
+*      isEvaluated:
+*        type: tinyint(1)
+*  user:
+*    type: object
+*    properties:
+*      id:
+*        type: int(11)
+*      nick_name:
+*        type: varchar(50)
+*      age:
+*        type: int(11)
+*      sex:
+*        type: int
+*      photo:
+*        type: varchar(50)
+*      join_date:
+*        type: datetime
+*      score_normal:
+*        type: int(11)
+*      score_good:
+*        type: int(11)
+*      score_great:
+*        type: int(11)
+*      score_sum:
+*        type: int(11)
+*      kakao_id:
+*        type: bigint(20)
 *    xml:
 *      name: board
-*
 */
+
   Category:
     type: object
     properties:
@@ -126,18 +195,18 @@
 *     description: to get lsit of board from DB
 *     produces:
 *       - application/json
-*     parameters:
-*       - name: username
-*         description: Username to use for login.
-*         in: formData
-*         required: true
-*         type: string
-*       - name: password
-*         description: User's password.
-*         in: formData
-*         required: true
-*         type: string
 *     responses:
-*       200:
-*         description: board
+*       '200':
+*         description: OK
+*         content:
+*           application/json:
+*             schema:
+*               type: object
+*               properties:
+*                 id:
+*                   type: integer
+*                   format: int64
+*                   example: 1
+*       default:
+*         description: Unexpected error
 */
