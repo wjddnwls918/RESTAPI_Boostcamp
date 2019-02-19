@@ -4,6 +4,16 @@ module.exports = (app,db,sequelize) => {
 
     // test api 및  util api
 
+    function getCurrentTime() {
+
+
+      let currentTime = Date.now();
+
+      //currentTime.setHours(currentTime.getHours()+9);
+
+      return currentTime;
+    }
+
 
     //테이블 조회
 
@@ -105,14 +115,15 @@ module.exports = (app,db,sequelize) => {
     //score_sum 필드를 기준으로 사용자 등수를 가져옴
     function getMyRanking(kakao_id) {
 
-      const query = "SELECT id,nick_name, score_sum, rank FROM ("
+      const query = "SELECT * FROM ("
                   + "SELECT    id,"
                   + "nick_name,"
                   + "score_sum,"
+                  + "photo,"
                   + "@vRank := @vRank + 1 AS rank "
                   + "FROM      `user` AS p, (SELECT @vRank := 0) AS r "
                   + "ORDER BY  score_sum DESC "
-                  + ") AS CNT WHERE id = (SELECT `id` FROM `user` WHERE `kakao_id` = "+kakao_id+") limit 1;";
+                  + ") AS CNT WHERE id = (SELECT `id` FROM `user` WHERE `kakao_id` = "+kakao_id+") limit 1";
 
 
       return query;
@@ -134,7 +145,8 @@ module.exports = (app,db,sequelize) => {
 
     function getRecommendBoard(longitude, latitude) {
 
-      const query = "SELECT * from board join user on board.writer_id = user.kakao_id "
+      const query = "SELECT * from board "
+        //+" join user on board.writer_id = user.kakao_id "
         +" where longitude>="+(Number(longitude) - 0.05)+" and longitude<="+(Number(longitude) + 0.05)
         +" and latitude>="+(Number(latitude) - 0.05)+" and latitude<="+(Number(latitude) + 0.05)+" limit 4";
 
@@ -189,6 +201,7 @@ module.exports = (app,db,sequelize) => {
             offset: 0,
             limit: 10,
             order: [['score_sum', 'DESC']]
+            ,  type: sequelize.QueryTypes.SELECT
         }).then(function(result) {
             res.json(result);
         }).catch(function(err) {
@@ -205,8 +218,8 @@ module.exports = (app,db,sequelize) => {
 
     function getCurrentPosBoard(left_longitude, left_latitude, right_longitude, right_latitude) {
 
-        const query = "SELECT * FROM `board` WHERE `longitude` >= "+left_longitude+" AND `longitude` <= "+right_longitude
-                      +" AND `latitude` >= "+left_latitude+" AND `latitude` <= "+right_latitude;
+        const query = "SELECT * FROM `board` WHERE `longitude` >= "+Number(left_longitude)+" AND `longitude` <= "+Number(right_longitude)
+                      +" AND `latitude` >= "+Number(left_latitude)+" AND `latitude` <= "+Number(right_latitude);
         return query;
     }
 
@@ -219,55 +232,61 @@ module.exports = (app,db,sequelize) => {
         );
 
 
-    //Board_Preview-------------------------------
 
+    //Board_Preview-------------------------------
+    //참가하기
     app.post( "/board/participation", (req,res) =>
     {
 
+      db.participation.findOne({
+        where : {
+          user_id : req.headers.kakao_id,
+          board_id : req.body.board_id
+        }
+      }).then( (result) => {
+        //console.log(result);
+        if(result === null){
+
+          db.board.update({
+             current_person : sequelize.literal('current_person + 1'),
+          }, {
+              where : {
+                  id : req.body.board_id
+              }
+          }).then( (result) => {
+            //res.json(result);
+            //console.log("arrived1");
+          });
 
 
-        db.token.findOne({
-          attributes : ['user_id'],
-          where : {
-            access_token : req.headers.access_token
-          }
-        }).then( result => {
-
-          console.log(result);
-
-          if(result!=null){
-            db.participation.create({
-              user_id : result,
-              board_id : req.headers.board_id,
-              is_evaluated : 0
-            })
-
-          }
-
-        });
-
-
-        //console.log(user_id);
-
-        db.board.update({
-            current_person : current_person+1
-        },
-        {
-          where : {
-            board_id : req.headers.board_id
-          }
+          db.participation.create({
+              user_id : req.headers.kakao_id,
+              join_time : db.sequelize.NOW,
+              board_id : req.body.board_id,
+              isEvaluated : 0
+          }).then( (result) => {
+            //res.json(result);
+            //console.log("arrived2");
+          });
         }
 
-      ).then( result => res.json(result))
+
+        res.json({ "code" : 200,
+           "message" : "success"
+         } );
+      }).catch( (err) => res.json({ "code" : 400,
+         "message" : "error, check your code"
+        }));
 
     });
+
 
 
 
     //Map_Search----------------------------------
 
     //검색어로 위치에 해당하는 게시글 검색하기
-    function getSearchBoard(keyword, min_time, max_time, min_age, max_age, budget ) {
+    function getSearchBoard(keyword, min_time, max_time, min_age, max_age, budget, max_person ) {
 
         console.log(typeof(budget));
 
@@ -283,7 +302,8 @@ module.exports = (app,db,sequelize) => {
 
         + " and appointed_time >= date_add(date(now()), INTERVAL "+min_time+" hour) and appointed_time <= date_add(date(now()), INTERVAL "+max_time+" hour)"
         + " and min_age >= "+min_age+" and max_age <= "+max_age
-        + " and budget <= "+transBudget+"";
+        + " and budget <= "+transBudget
+        + " and max_person <= "+max_person+";";
 
 
         return query;
@@ -293,7 +313,7 @@ module.exports = (app,db,sequelize) => {
 
 
     app.get( "/search/list" , (req,res) => {
-        db.sequelize.query( getSearchBoard(req.query.keyword, req.query.min_time, req.query.max_time, req.query.min_age, req.query.max_age, req.query.budget)
+        db.sequelize.query( getSearchBoard(req.query.keyword, req.query.min_time, req.query.max_time, req.query.min_age, req.query.max_age, req.query.budget, req.query.max_person)
                           , { type: sequelize.QueryTypes.SELECT } )
         .then( (result) => res.json(result) )
 
@@ -314,6 +334,7 @@ module.exports = (app,db,sequelize) => {
     //사용자가 생성한 게시글 불러오기
     function getMyBoard( access_token ) {
 
+
         const query = "SELECT b.id, b.address, b.title, b.appointed_time, b.current_person, b.max_person, b.write_date, b.content,"
                     + "b.latitude, b.longitude, b.budget, b.min_age, b.max_age ,"
                     + "u.nick_name, u.photo FROM board b "
@@ -326,55 +347,137 @@ module.exports = (app,db,sequelize) => {
     }
 
 
-    app.get( "/board/list/my" , (req,res) =>
-        db.sequelize.query( getMyBoard( req.headers.access_token ) , { type: sequelize.QueryTypes.SELECT } )
-        .then( (result) => res.json(result) )
+    app.get( "/board/list/my" , (req,res) => {
 
-        );
+       /*  db.sequelize.query( getMyBoard( req.headers.access_token ) , { type: sequelize.QueryTypes.SELECT } )
+        .then( (result) => res.json(result) )*/
+
+        db.board.findAll({
+        where: {
+            writer_id : req.headers.kakao_id,
+            validation : 0
+        }
+        ,  type: sequelize.QueryTypes.SELECT
+      }).then( (result) =>{
+
+        res.json(result);
+
+        })
+        .catch( (e) => res.send("error!"));
+
+
+      });
 
 
     //사용자가 참여중인 게시글 불러오기
 
-    function currentJoinBoard( access_token ) {
-
-        const query ="SELECT b.id, b.address, b.title, b.appointed_time, b.current_person, b.max_person, b.write_date, b.content,"
-                    +"b.latitude, b.longitude, b.budget, b.min_age, b.max_age, u.photo, u.nick_name"
+    function currentJoinBoard( kakao_id ) {
+/*
+        const query =" SELECT b.id, b.address, b.title, b.appointed_time, b.current_person, b.max_person, b.write_date, b.content,"
+                    +" b.latitude, b.longitude, b.budget, b.min_age, b.max_age, u.photo, u.nick_name"
                     +" FROM board b "
-                    +"LEFT JOIN participation p ON p.board_id = b.id "
-                    +"LEFT JOIN user u ON b.writer_id = u.id "
-                    +"LEFT JOIN token t ON t.user_id = p.user_id "
-                    +"WHERE t.access_token LIKE "+access_token +" AND b.writer_id != t.user_id;";
+                    +" LEFT JOIN participation p ON p.board_id = b.id "
+                    +" LEFT JOIN user u ON b.writer_id = u.kakao_id"
+
+                    +" WHERE t.kakao_id LIKE "+kakao_id +" AND b.writer_id != t.user_id;";
 
         return query;
+*/
 
+        const query ="select *"
+                    +" from board as b"
+                    +"  where id  in("
+                    +"  select board_id from participation where user_id ="+kakao_id
+                    +"  ) and  b.writer_id !="+kakao_id +";";
+
+        return query;
     }
 
-    app.get( "/board/list/participation/", (req,res) =>
+    app.get( "/board/list/participation/", (req,res) =>{
 
-        db.sequelize.query( currentJoinBoard ( req.headers.access_token ) , { type: sequelize.QueryTypes.SELECT } )
-        .then( result => res.json(result))
 
-    );
+        db.sequelize.query( currentJoinBoard ( req.headers.kakao_id ) , { type: sequelize.QueryTypes.SELECT } )
+        .then( result => {
+
+
+
+          res.json(result);
+        })
+
+
+
+/*
+      db.participation.findAll({
+        attributes : ['board_id'],
+        where : {
+          user_id : req.headers.kakao_id
+        }
+      }).then( (result) => {
+        res.json(result);
+      })*/
+});
 
 
     //Board_Add-----------------------------------
 
     //사용자가 작성한 게시글 등록
-    app.post( "/board", (req,res) =>
-        db.board.create({
+    app.post( "/board", (req,res) =>{
+
+        db.board.create(
+          //timezone: '+09:00',
+          {
             title : req.body.title,
             address : req.body.address,
             appointed_time : req.body.appointed_time,
+            restaurant_name : req.body.restaurant_name,
             max_person : req.body.max_person,
             writer_id : req.body.writer_id,
+            write_date : getCurrentTime(),
             min_age : req.body.min_age,
             max_age : req.body.max_age,
             budget : req.body.budget,
             content : req.body.content,
             longitude : req.body.longitude,
-            latitude : req.body.latitude
-        }).then( (result) => res.json(result) )
-        );
+            latitude : req.body.latitude,
+            writer_photo : req.body.writer_photo,
+            expire_date : getCurrentTime(),
+            writer_name : req.body.writer_name
+        }).then( () =>{
+
+          db.board.findOne({
+            attributes : ['id'],
+            where : {
+              writer_id : req.body.writer_id
+            },
+            order: [
+               ['id', 'DESC']
+            ]
+
+          }).then( (board_id) => {
+            console.log(JSON.stringify(board_id));
+            db.participation.create({
+                user_id : req.body.writer_id,
+                join_time : getCurrentTime(),
+                board_id : board_id.id,
+                isEvaluated : 0
+            }).then( (result) => {
+              //res.json(result);
+              //console.log("arrived2");
+            });
+
+          });
+
+        });
+
+
+
+
+
+          res.json({ "code" : 200,
+             "message" : "success"
+           });
+
+      });
 
 
     //Board_Detail--------------------------------

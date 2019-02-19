@@ -29,7 +29,6 @@ module.exports = (sequelize, DataTypes) => {
 		restaurant_name : {
 			type : DataTypes.STRING(50),
 			allowNull : false,
-            defaultValue : ""
 		},
 		writer_id : {
 			type : DataTypes.INTEGER,
@@ -73,6 +72,14 @@ module.exports = (sequelize, DataTypes) => {
         },
         max_age : {
             type : DataTypes.INTEGER,
+            allowNull : false
+        },
+        writer_photo : {
+            type : DataTypes.STRING(200),
+            allowNull : true
+        },
+        writer_name : {
+            type : DataTypes.STRING(50),
             allowNull : false
         }
 

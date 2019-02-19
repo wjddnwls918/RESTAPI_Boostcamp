@@ -24,7 +24,6 @@ module.exports = (sequelize, DataTypes) => {
         },
         join_date : {
             type : DataTypes.DATE,
-            allowNull : true,
             defaultValue : DataTypes.NOW
         },
         score_normal : {
