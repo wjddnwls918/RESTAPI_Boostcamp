@@ -1,6 +1,6 @@
 
 # ignore privatekey.json
-./restboost/privatekey.json
+/restboost/privatekey.json
 
 # ignore package.json
-./restboost/package.json
+/restboost/package.json
