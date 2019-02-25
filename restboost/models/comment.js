@@ -5,8 +5,8 @@ module.exports = (sequelize, DataTypes) => {
 			primaryKey : true,
 			autoIncrement : true
 		},
-		writer_id : {
-			type : DataTypes.INTEGER,
+		kakao_id : {
+			type : DataTypes.BIGINT,
 			allowNull : false
 		},
 		board_id : {

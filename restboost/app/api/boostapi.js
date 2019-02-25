@@ -1,6 +1,6 @@
 
 
-module.exports = (app,db,sequelize) => {
+module.exports = (app,db,sequelize,fcm) => {
 
     // test api 및  util api
 
@@ -13,7 +13,6 @@ module.exports = (app,db,sequelize) => {
 
       return currentTime;
     }
-
 
     //테이블 조회
 
@@ -33,11 +32,76 @@ module.exports = (app,db,sequelize) => {
         db.user.findAll().then( (result) => res.json(result) )
         );
 
-    app.get( "/participation", (req,res) =>
-        db.participation.findAll().then( (result) => res.json(result))
-        );
+    app.get( "/participation", (req,res) =>{
+        db.participation.findAll().then( (result) => res.json(result));
 
+/*
+        let token = 'cND3-AWKEvI:APA91bFz2npTL6cJISR4Frsd9dIaMYsSIbokZsRxeDXnpf9qDMPPjwcWMTHGTuq9ur60-nifTiU-xLdP_iBbO2oo8UGqysMqo4Q8YYUMg6aQOASGsA7veIWXmDsNwW0Il9Xc25Jd9RMR';
 
+        fcm.subscribeToTopic([ token ], '104', (err, res) => {
+          if( err) {
+            console.log(err);
+          }else {
+            console.log(res);
+          }
+
+        });
+*/
+
+      });
+
+    app.get( "/fcmtoken", (req,res) =>{
+
+        db.fcmtoken.findAll().then( (result) => res.json(result))
+        var topic = '104';
+
+        let token = 'cND3-AWKEvI:APA91bFz2npTL6cJISR4Frsd9dIaMYsSIbokZsRxeDXnpf9qDMPPjwcWMTHGTuq9ur60-nifTiU-xLdP_iBbO2oo8UGqysMqo4Q8YYUMg6aQOASGsA7veIWXmDsNwW0Il9Xc25Jd9RMR';
+
+        // See documentation on defining a message payload.
+        var message = {
+          data: {
+            score: '850',
+            time: '2:45'
+          },
+          //topic: topic
+          token : token
+        };
+
+        // Send a message to devices subscribed to the provided topic.
+    /*    admin.messaging().send(message)
+          .then((response) => {
+            // Response is a message ID string.
+            console.log('Successfully sent message:', response);
+          })
+          .catch((error) => {
+            console.log('Error sending message:', error);
+          });
+*/
+/*
+        var message = { //this may vary according to the message type (single recipient, multicast, topic, et cetera)
+                //to: 'cND3-AWKEvI:APA91bFz2npTL6cJISR4Frsd9dIaMYsSIbokZsRxeDXnpf9qDMPPjwcWMTHGTuq9ur60-nifTiU-xLdP_iBbO2oo8UGqysMqo4Q8YYUMg6aQOASGsA7veIWXmDsNwW0Il9Xc25Jd9RMR',
+                to: "/topics/107",
+
+                notification: {
+                    title: 'Title of your push notification',
+                    body: 'Body of your push notification'
+                },
+
+                data: {  //you can send only notification or only data(or include both)
+                    my_key: 'my value',
+                    my_another_key: 'my another value'
+                }
+            };
+
+            fcm.send(message, function(err, response){
+                if (err) {
+                    console.log("Something has gone wrong!");
+                } else {
+                    console.log("Successfully sent with response: ", response);
+                }
+            });
+*/
+      });
 
 
 
@@ -52,6 +116,26 @@ module.exports = (app,db,sequelize) => {
     const Op = sequelize.Op
 
 
+ /* 1 */
+    function getTodayBoard() {
+
+      const query = "select * from board "
+      + " where DATE(write_date) = DATE(NOW());"
+
+      return query;
+    }
+
+    app.get("/board/today", (req,res) => {
+
+      db.sequelize.query( getTodayBoard( ) ,  { type: sequelize.QueryTypes.SELECT } )
+      .then( (result) => res.json(result) )
+      .catch( (err) => res.json({ "code" : 400,
+         "message" : "error, check your code"
+        }))
+
+    })
+
+ /* 2 */
     //MyPage
     app.get("/user/info" , (req,res) => {
       db.user.findOne({
@@ -68,6 +152,7 @@ module.exports = (app,db,sequelize) => {
 
 
 
+ /* 3 */
     //Login---------------------------------------
     //카카오 로그인 시 토큰 정보 서버 저장
     app.post( "/login/token", (req,res) =>
@@ -82,6 +167,8 @@ module.exports = (app,db,sequelize) => {
         );
 
 
+
+ /* 4 */
     //카카오 로그인 시 유저 정보 서버 저장
     //이거 기존 사용자가 로그인 다시하면 안들어가게 해야됨
     //미완
@@ -108,10 +195,9 @@ module.exports = (app,db,sequelize) => {
     });
 
 
+
+ /* 5 */
     //Home----------------------------------------
-
-
-
     //score_sum 필드를 기준으로 사용자 등수를 가져옴
     function getMyRanking(kakao_id) {
 
@@ -141,14 +227,17 @@ module.exports = (app,db,sequelize) => {
 
 
 
+/* 6 */
     //현재 사용자 위치를 기준으로 1okm안 추천 게시글을 가져옴
-
     function getRecommendBoard(longitude, latitude) {
 
       const query = "SELECT * from board "
         //+" join user on board.writer_id = user.kakao_id "
         +" where longitude>="+(Number(longitude) - 0.05)+" and longitude<="+(Number(longitude) + 0.05)
-        +" and latitude>="+(Number(latitude) - 0.05)+" and latitude<="+(Number(latitude) + 0.05)+" limit 4";
+        +" and latitude>="+(Number(latitude) - 0.05)+" and latitude<="+(Number(latitude) + 0.05)
+        //+ " and write_date >= now() - INTERVAL 1 DAY"
+        + " and DATE(write_date) = DATE(NOW())"
+        +" limit 4";
 
       return query;
     }
@@ -159,40 +248,13 @@ module.exports = (app,db,sequelize) => {
       .catch( err =>  res.json({ "code" : 400,
          "message" : "error, check your code"
        }))
-/*
-      db.user.hasMany(db.board, {foreignKey:'writer_id'});
-      db.board.belongsTo(db.user, {foreignKey: 'writer_id'});
-      db.board.findAll({
 
-        where :{
-          [Op.and] : [ {longitude : {[Op.gte]: (Number(req.query.longitude) - 0.05) } },
-                      {longitude : {[Op.lte]: (Number(req.query.longitude) + 0.05) } },
-                      {latitude : {[Op.gte]: (Number(req.query.latitude) - 0.05) }},
-                      {latitude : {[Op.lte]: (Number(req.query.latitude) + 0.05) }}
-                     ]
-        },
-        limit : 4,
-        include: [{
-          model: db.user,
-          //attributes : {kakao_id}
-          //where: ["writer_id = kakao_id"],
-          //through: {
-          //  attributes: ['photo'],
-            //where: {completed: true}
-          //},
-          required: true
-        }]
-
-      }).then( result => res.json(result))
-      .catch( err =>  res.json({ "code" : 400,
-         "message" : "error, check your code"
-        }))
-*/
   });
 
 
 
 
+/* 7 */
     //Score_sum 필드를 기준으로 상위 10명에 대한 사용자 정보(사진, 닉네임)
     app.get( "/home/ranking/user", (req,res) =>
         db.user.findAll(
@@ -212,14 +274,19 @@ module.exports = (app,db,sequelize) => {
 
 
 
+
     //Map-----------------------------------------
 
-    //사용자가 지정한 위치의 경도, 위도를 보내 게시글의 리스트를 가져옴
 
+    /* 8 */
+    //사용자가 지정한 위치의 경도, 위도를 보내 게시글의 리스트를 가져옴
     function getCurrentPosBoard(left_longitude, left_latitude, right_longitude, right_latitude) {
 
-        const query = "SELECT * FROM `board` WHERE `longitude` >= "+Number(left_longitude)+" AND `longitude` <= "+Number(right_longitude)
-                      +" AND `latitude` >= "+Number(left_latitude)+" AND `latitude` <= "+Number(right_latitude);
+        const query = "SELECT * FROM `board` WHERE (`longitude` >= "+Number(left_longitude)+" AND `longitude` <= "+Number(right_longitude)
+                      +" AND `latitude` >= "+Number(left_latitude)+" AND `latitude` <= "+Number(right_latitude)+")"
+                      //+ " and write_date >= now() - INTERVAL 1 DAY";
+                      + " and DATE(write_date) = DATE(NOW())"
+                      +";";
         return query;
     }
 
@@ -234,6 +301,8 @@ module.exports = (app,db,sequelize) => {
 
 
     //Board_Preview-------------------------------
+
+    /* 9 */
     //참가하기
     app.post( "/board/participation", (req,res) =>
     {
@@ -285,6 +354,7 @@ module.exports = (app,db,sequelize) => {
 
     //Map_Search----------------------------------
 
+    /* 10 */
     //검색어로 위치에 해당하는 게시글 검색하기
     function getSearchBoard(keyword, min_time, max_time, min_age, max_age, budget, max_person ) {
 
@@ -299,11 +369,13 @@ module.exports = (app,db,sequelize) => {
         }
 
         const query = "SELECT * FROM `board` WHERE address like \'%"+keyword+"%\' "
-
-        + " and appointed_time >= date_add(date(now()), INTERVAL "+min_time+" hour) and appointed_time <= date_add(date(now()), INTERVAL "+max_time+" hour)"
+        //+ " and DATE(write_date) = DATE(NOW())"
+        + " and (appointed_time >= date_add(date(now()), INTERVAL "+min_time+" hour) and appointed_time <= date_add(date(now()), INTERVAL "+max_time+" hour)"
         + " and min_age >= "+min_age+" and max_age <= "+max_age
         + " and budget <= "+transBudget
-        + " and max_person <= "+max_person+";";
+        + " and max_person <= "+max_person +")"
+        //+ " and write_date >= now() - INTERVAL 1 DAY"
+        +";";
 
 
         return query;
@@ -322,25 +394,20 @@ module.exports = (app,db,sequelize) => {
      );
 
 
-/*
-    app.get( "/search/list" , (req,res) =>
-        res.send("test")
-        );
-*/
-
-
     //Board_List----------------------------------
 
+    /* 11 */
     //사용자가 생성한 게시글 불러오기
-    function getMyBoard( access_token ) {
+    function getMyBoard( kakao_id ) {
 
 
-        const query = "SELECT b.id, b.address, b.title, b.appointed_time, b.current_person, b.max_person, b.write_date, b.content,"
-                    + "b.latitude, b.longitude, b.budget, b.min_age, b.max_age ,"
-                    + "u.nick_name, u.photo FROM board b "
-                    + "LEFT JOIN user u ON b.writer_id = u.id "
-                    + "LEFT JOIN token t ON u.id = t.user_id "
-                    + "WHERE t.access_token LIKE "+access_token;
+        const query = "SELECT * from board "
+                    + " WHERE writer_id ="+kakao_id
+                    + " and validation = 0"
+                    + " and DATE(write_date) = DATE(NOW())"
+                    //+ " and DATE(write_date) = CURDATE()"
+                    //+ " and write_date >= now() - INTERVAL 1 DAY"
+                    + " order by id desc;";
 
         return query;
 
@@ -349,46 +416,24 @@ module.exports = (app,db,sequelize) => {
 
     app.get( "/board/list/my" , (req,res) => {
 
-       /*  db.sequelize.query( getMyBoard( req.headers.access_token ) , { type: sequelize.QueryTypes.SELECT } )
-        .then( (result) => res.json(result) )*/
-
-        db.board.findAll({
-        where: {
-            writer_id : req.headers.kakao_id,
-            validation : 0
-        }
-        ,  type: sequelize.QueryTypes.SELECT
-      }).then( (result) =>{
-
-        res.json(result);
-
-        })
-        .catch( (e) => res.send("error!"));
-
+         db.sequelize.query( getMyBoard( req.headers.kakao_id ) , { type: sequelize.QueryTypes.SELECT } )
+        .then( (result) => res.json(result) )
 
       });
 
 
     //사용자가 참여중인 게시글 불러오기
-
+    /* 12 */
     function currentJoinBoard( kakao_id ) {
-/*
-        const query =" SELECT b.id, b.address, b.title, b.appointed_time, b.current_person, b.max_person, b.write_date, b.content,"
-                    +" b.latitude, b.longitude, b.budget, b.min_age, b.max_age, u.photo, u.nick_name"
-                    +" FROM board b "
-                    +" LEFT JOIN participation p ON p.board_id = b.id "
-                    +" LEFT JOIN user u ON b.writer_id = u.kakao_id"
-
-                    +" WHERE t.kakao_id LIKE "+kakao_id +" AND b.writer_id != t.user_id;";
-
-        return query;
-*/
 
         const query ="select *"
                     +" from board as b"
                     +"  where id  in("
                     +"  select board_id from participation where user_id ="+kakao_id
-                    +"  ) and  b.writer_id !="+kakao_id +";";
+                    +"  ) and  b.writer_id !="+kakao_id
+                    + " and DATE(write_date) = DATE(NOW())"
+                    //+ " and write_date >= now() - INTERVAL 1 DAY"
+                    +" order by id desc;";
 
         return query;
     }
@@ -405,26 +450,17 @@ module.exports = (app,db,sequelize) => {
         })
 
 
-
-/*
-      db.participation.findAll({
-        attributes : ['board_id'],
-        where : {
-          user_id : req.headers.kakao_id
-        }
-      }).then( (result) => {
-        res.json(result);
-      })*/
 });
 
 
+    /* 13 */
     //Board_Add-----------------------------------
 
     //사용자가 작성한 게시글 등록
+    //게시글 작성
     app.post( "/board", (req,res) =>{
 
         db.board.create(
-          //timezone: '+09:00',
           {
             title : req.body.title,
             address : req.body.address,
@@ -455,21 +491,34 @@ module.exports = (app,db,sequelize) => {
 
           }).then( (board_id) => {
             console.log(JSON.stringify(board_id));
+
             db.participation.create({
                 user_id : req.body.writer_id,
                 join_time : getCurrentTime(),
                 board_id : board_id.id,
                 isEvaluated : 0
             }).then( (result) => {
-              //res.json(result);
-              //console.log("arrived2");
+
             });
+
+
+            //구독 설정
+
+            let token = req.headers.token;
+
+            fcm.subscribeToTopic([ token ], String(board_id.id), (err, res) => {
+              if( err) {
+                console.log(err);
+              }else {
+                console.log(res);
+              }
+
+            });
+
 
           });
 
         });
-
-
 
 
 
@@ -482,53 +531,172 @@ module.exports = (app,db,sequelize) => {
 
     //Board_Detail--------------------------------
 
+    /* 14 */
+
+
     //게시글에 달린 댓글 불러오기
-    app.get( "/board/comment/:board_id", (req,res) =>
-        db.comment.findAll({
-        where: {
-            board_id : req.params.board_id
-        }
+    //board_id, comment
+    function getBoardComment(kakao_id, board_id) {
 
-        }).then( (result) => res.json(result) )
-        );
-
-
-    //User_Evaluation-----------------------------
+      const query = " SELECT c.*, u.nick_name "
+      + " FROM comment c "
+      + " LEFT JOIN user u ON u.kakao_id = c.kakao_id "
+      + " WHERE c.board_id ="+ board_id
 
 
-    function updateUserScoreQuery(user) {
+      return query;
+    }
 
-        const query =  "SET @score=2;";
-                    + " UPDATE USER u";
-                    + " SET";
+    app.get( "/board/comment/", (req,res) =>{
 
-                    + "score_normal = IF(@score=2, u.score_normal+1, u.score_normal),";
-                    + " score_good = IF(@score=3, u.score_good+1, u.score_good),";
-                    + " score_great = IF(@score=5, u.score_great+1, u.score_great),";
-                    + " score_sum =";
-                    + " CASE(@score)";
-                    + " WHEN 2 THEN (score_sum+2)";
-                    + " WHEN 3 THEN (score_sum+3)";
-                    + " WHEN 5 THEN (score_sum+5)";
-                    + " END";
-                    + " WHERE u.id IN ("+users+");";
+      db.sequelize.query(getBoardComment(req.headers.kakao_id, req.query.board_id) , { type: sequelize.QueryTypes.SELECT })
 
+      .then( (result) => res.json(result) )
+    });
+
+
+    /* 15 */
+    //댓글 작성
+
+  function getTopicMessage(topic) {
+    let commentAddMessage = {
+      to : "/topics/"+topic,
+        "data": {
+    		"title": "제목입니다",
+    		"message": "내용입니다"
+    	},
+      notification: {
+        title: 'test message',
+        body: 'hello Nodejs'
+      }
+
+
+    };
+    return commentAddMessage;
+  }
+
+    app.post( "/board/comment", (req,res) => {
+
+
+
+        db.comment.create( {
+
+          kakao_id : req.headers.kakao_id,
+          board_id : req.body.board_id,
+          write_time : getCurrentTime(),
+          content : req.body.content
+
+
+        }).then( ()=> {
+
+          //구독 등록
+
+          let token = req.headers.token;
+
+          fcm.subscribeToTopic([ token ], String(req.body.board_id), (err, res) => {
+            if( err) {
+              console.log(err);
+            }else {
+              console.log(res);
+            }
+
+          });
+
+          //메시지 보내기
+
+          var message = { //this may vary according to the message type (single recipient, multicast, topic, et cetera)
+
+                  to: "/topics/"+String(req.body.board_id),
+
+                  notification: {
+                      title: "댓글을 확인해 주세요",
+                      body: req.body.content,
+                      sound:"default"
+                  },
+                  data: {  //you can send only notification or only data(or include both)
+                      board_id: req.body.board_id,
+                  }
+              };
+
+              fcm.send(message, function(err, response){
+                  if (err) {
+                      console.log("Something has gone wrong!");
+                  } else {
+                      console.log("Successfully sent with response: ", response);
+                  }
+              });
+
+
+          res.json({ "code" : 200,
+             "message" : "success"
+           });
+
+
+        }).catch( (err) => res.json({ "code" : 400,
+           "message" : "error, check your code"
+         }));
+
+
+    })
+
+
+    /* 16 */
+    //Board_Evaluation-----------------------------
+    //게시글 평가
+
+    function updateBoardrScoreQuery(writer_id, board_id, score) {
+
+        const query =  " UPDATE user"
+                    + " SET"
+                    + " score_normal = IF(" + score + "=2, score_normal+1, score_normal),"
+                    + " score_good = IF(" + score + "=3, score_good+1, score_good),"
+                    + " score_great = IF(" + score + "=5, score_great+1, score_great),"
+                    + " score_sum = score_sum + " + score
+                    + " WHERE kakao_id ="+writer_id+";";
                     return query;
     }
 
-    app.put( "/board/user/evaluation", (req,res) =>{
+    app.put( "/mypage/judge", (req,res) =>{
 
-      let users = req.body.users;
+      let users = req.headers.kakao_id;
 
-      for(user in users) {
-        db.sequelize.query( updateUserScoreQuery ( user ) )
-        .then( result => res.json(result))
+      console.log(users);
+
+        db.sequelize.query( updateBoardrScoreQuery ( req.body.writer_id, req.body.board_id, req.body.score ) )
+        .then( result =>{
+          // res.json(result)
+
+
+            db.participation.update(
+              { isEvaluated : true  },
+              { where : {
+                user_id : req.headers.kakao_id,
+                board_id : req.body.board_id
+              }}
+            ).then( () => {
+
+              //구독해제
+
+              let token = req.headers.token;
+
+              fcm.unsubscribeToTopic([ token ], String(req.body.board_id), (err, res) => {
+                if( err) {
+                  console.log(err);
+                }else {
+                  console.log(res);
+                }
+              });
+
+              res.json({ "code" : 200,
+                 "message" : "success"
+               });
+            });
+
+
+        })
         .catch(function(err) {
             res.send("error");
         })
-
-
-      }
 
 
     });
@@ -536,6 +704,7 @@ module.exports = (app,db,sequelize) => {
 
 
 
+    /* 17 */
     //MyPage_Edit---------------------------------
 
     //닉네임, 나이 , 성별 , 프로필 사진업데이트
@@ -557,6 +726,91 @@ module.exports = (app,db,sequelize) => {
          ).then( (result) => res.json(result) )
    );
 
+
+
+    /* 18 */
+   //방 평가 ( 유저, 방 id, 점수)
+/*
+   function boardEvaluation(kakao_id,) {
+
+     let query = "update "
+     + "(SELECT `board_id` FROM `participation` "
+     + "  WHERE user_id ="+ kakao_id +" and isEvaluated=0) and `writer_id` != "+kakao_id+";";
+
+     return query;
+   }
+
+
+   app.post( "/board/evaluation" , (req,res) => {
+
+
+
+
+     db.sequelize.query( boardEvaluation ( req.headers.kakao_id )  )
+     .then( ()=> {
+       res.json({ "code" : 200,
+          "message" : "success"
+        });
+     }).catch( (err) => res.json({ "code" : 400,
+        "message" : "error, check your code"
+      }));
+
+      //구독 해제
+      let token = req.headers.token;
+
+      fcm.unsubscribeToTopic([ token ], String(req.body.board_id), (err, res) => {
+        if( err) {
+          console.log(err);
+        }else {
+          console.log(res);
+        }
+
+
+   })
+
+*/
+
+
+    /* 19 */
+   //평가 방정보 얻어오기
+
+   function getBoardToEvaluation(kakao_id) {
+
+     const query = "select * from `board` where `id` in (SELECT board_id FROM `participation`"
+                 + " WHERE user_id = "+kakao_id+" and isEvaluated = 0 "
+                 +" and join_time <= DATE_SUB(now(), INTERVAL 1 DAY)"
+                 +" ) and `writer_id` !="+ kakao_id
+                // + " and appointed_time <= DATE_SUB(now(), INTERVAL 1 DAY);"
+                 +";";
+
+     return query;
+   }
+
+   app.get( "/mypage/judge" , (req,res) => {
+
+     db.sequelize.query( getBoardToEvaluation ( req.headers.kakao_id )  , { type: sequelize.QueryTypes.SELECT } )
+     .then( result => {
+       res.json(result);
+     })
+
+
+   })
+
+
+   /* 20 */
+   //FCM 토큰 넣기
+
+   app.post("/fcm/token", (req,res) => {
+
+     db.fcmtoken.create({
+       token : req.headers.token
+     }).then( (result)=> {
+       res.json(result)
+     }).catch( (err) => res.json({ "code" : 400,
+        "message" : "error, check your code"
+      }));
+
+   })
 
 
 

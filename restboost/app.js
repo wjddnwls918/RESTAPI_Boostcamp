@@ -11,6 +11,12 @@ const apiBoost = require("./app/api/boostapi");
 const db = require("./models");
 const Sequelize = require('sequelize');
 
+const FCM = require('fcm-node');
+const serverKey = 'AAAA_Xv_CYI:APA91bFRdd775Hios_TKhrJTpjbLoHG_wx_Z-pYQTdCwCEHS2pgmDZVZWO0mFEWVhmx9_'
++'HnsQUtXmA1G_IJz9A3dkmH_wYwxk943UmL3_J4RJnnk0XddZ61o1bnYfiTYQNq5Oi2zqfa8';
+const fcm = new FCM(serverKey);
+
+//const admin = firebaseAdmin.initializeApp();
 //swagger
 
 const swaggerJSDoc = require('swagger-jsdoc');
@@ -23,7 +29,7 @@ const options = {
     },
   },
   // Path to the API docs
-  apis: ['./app/api/swagger.js'],
+  apis: ['./app/api/swagger.yaml'],
 };
 
 const swaggerUi = require('swagger-ui-express');
@@ -36,7 +42,7 @@ app.use(bodyParser.urlencoded({extended:false}));
 app.use(bodyParser.json());
 
 
-apiBoost(app,db,Sequelize);
+apiBoost(app,db,Sequelize,fcm);
 
 
 // view engine setup
