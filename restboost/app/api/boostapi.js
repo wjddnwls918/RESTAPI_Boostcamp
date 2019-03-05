@@ -24,8 +24,8 @@ module.exports = (app,db,sequelize,fcm) => {
         db.comment.findAll().then( (result) => res.json(result))
         );
 
-    app.get( "/token", (req,res) =>
-        db.token.findAll().then( (result) => res.json(result) )
+    app.get( "/fcmtoken", (req,res) =>
+        db.fcmtoken.findAll().then( (result) => res.json(result) )
         );
 
     app.get( "/user", (req,res) =>
@@ -35,74 +35,7 @@ module.exports = (app,db,sequelize,fcm) => {
     app.get( "/participation", (req,res) =>{
         db.participation.findAll().then( (result) => res.json(result));
 
-/*
-        let token = 'cND3-AWKEvI:APA91bFz2npTL6cJISR4Frsd9dIaMYsSIbokZsRxeDXnpf9qDMPPjwcWMTHGTuq9ur60-nifTiU-xLdP_iBbO2oo8UGqysMqo4Q8YYUMg6aQOASGsA7veIWXmDsNwW0Il9Xc25Jd9RMR';
-
-        fcm.subscribeToTopic([ token ], '104', (err, res) => {
-          if( err) {
-            console.log(err);
-          }else {
-            console.log(res);
-          }
-
-        });
-*/
-
       });
-
-    app.get( "/fcmtoken", (req,res) =>{
-
-        db.fcmtoken.findAll().then( (result) => res.json(result))
-        var topic = '104';
-
-        let token = 'cND3-AWKEvI:APA91bFz2npTL6cJISR4Frsd9dIaMYsSIbokZsRxeDXnpf9qDMPPjwcWMTHGTuq9ur60-nifTiU-xLdP_iBbO2oo8UGqysMqo4Q8YYUMg6aQOASGsA7veIWXmDsNwW0Il9Xc25Jd9RMR';
-
-        // See documentation on defining a message payload.
-        var message = {
-          data: {
-            score: '850',
-            time: '2:45'
-          },
-          //topic: topic
-          token : token
-        };
-
-        // Send a message to devices subscribed to the provided topic.
-    /*    admin.messaging().send(message)
-          .then((response) => {
-            // Response is a message ID string.
-            console.log('Successfully sent message:', response);
-          })
-          .catch((error) => {
-            console.log('Error sending message:', error);
-          });
-*/
-/*
-        var message = { //this may vary according to the message type (single recipient, multicast, topic, et cetera)
-                //to: 'cND3-AWKEvI:APA91bFz2npTL6cJISR4Frsd9dIaMYsSIbokZsRxeDXnpf9qDMPPjwcWMTHGTuq9ur60-nifTiU-xLdP_iBbO2oo8UGqysMqo4Q8YYUMg6aQOASGsA7veIWXmDsNwW0Il9Xc25Jd9RMR',
-                to: "/topics/107",
-
-                notification: {
-                    title: 'Title of your push notification',
-                    body: 'Body of your push notification'
-                },
-
-                data: {  //you can send only notification or only data(or include both)
-                    my_key: 'my value',
-                    my_another_key: 'my another value'
-                }
-            };
-
-            fcm.send(message, function(err, response){
-                if (err) {
-                    console.log("Something has gone wrong!");
-                } else {
-                    console.log("Successfully sent with response: ", response);
-                }
-            });
-*/
-      });
-
 
 
     //--------------------------------------------
@@ -171,7 +104,6 @@ module.exports = (app,db,sequelize,fcm) => {
  /* 4 */
     //카카오 로그인 시 유저 정보 서버 저장
     //이거 기존 사용자가 로그인 다시하면 안들어가게 해야됨
-    //미완
 
     function setUser(kakao_id, nick_name, sex, age, photo) {
 
