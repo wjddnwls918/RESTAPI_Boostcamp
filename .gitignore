@@ -4,3 +4,6 @@
 
 # ignore package.json
 /restboost/package.json
+
+
+restboost/yarn.lock
